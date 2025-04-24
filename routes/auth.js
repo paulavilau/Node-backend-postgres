@@ -1,58 +1,84 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
 import dotenv from "dotenv";
-dotenv.config(); // Incarcare variabile de mediu
+import { db } from "../server.js"; // This is your pg Client or Pool
+
+dotenv.config();
 
 const router = express.Router();
 
-// Ruta pentru inregistrare
+// REGISTER
 router.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
+
   try {
-    // Verificam daca un user cu acelasi email exista deja
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: "Email deja folosit" });
+    // Check if user exists
+    const checkUser = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (checkUser.rows.length > 0) {
+      return res.status(400).json({ message: "Email deja folosit" });
+    }
 
-    // Genereaza un salt si hash pentru parola ????
+    // Hash password
     const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Crearea utilizator nou
-    user = new User({ name, email, password: hashed });
-    await user.save();
+    // Insert user into DB
+    const newUser = await db.query(
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email",
+      [name, email, hashedPassword]
+    );
 
-    // Creare token JWT pentru utilizator
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const user = newUser.rows[0];
+
+    // Create JWT
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
-    res.json({ token, user: { id: user._id, name, email } });
+    res.json({ token, user });
   } catch (err) {
-    res.status(500).json({ message: "Serverul a intampinat o eroare!" + err });
+    console.error(err);
+    res.status(500).json({ message: "Serverul a întâmpinat o eroare!" });
   }
 });
 
+// LOGIN
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
+
   try {
-    // Cautare user dupa email
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Email gresit" });
+    // Find user by email
+    const userQuery = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    const user = userQuery.rows[0];
 
-    // Verificare parola
+    if (!user) {
+      return res.status(400).json({ message: "Email greșit" });
+    }
+
+    // Check password
     const isMatching = await bcrypt.compare(password, user.password);
-    if (!isMatching) return res.status(400).json({ message: "Parola gresita" });
+    if (!isMatching) {
+      return res.status(400).json({ message: "Parolă greșită" });
+    }
 
-    // Crearea tokenului JWT
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    // Create JWT
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
-    res.json({ token, user: { id: user._id, name: user.name, email } });
+    // Return token and user info
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email },
+    });
   } catch (err) {
-    res.status(500).json({ message: "Eroare la server! " + err });
+    console.error(err);
+    res.status(500).json({ message: "Eroare la server!" });
   }
 });
 
