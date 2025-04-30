@@ -163,4 +163,38 @@ router.post("/lesson-progress", async (req, res) => {
   }
 });
 
+router.get("/last-lesson", async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      `
+      SELECT 
+        l.id AS lesson_id,
+        l.title,
+        l.order_index,
+        l.language_id,
+        lang.code AS language_code,
+        lang.icon AS language_icon
+      FROM user_progress up
+      JOIN lessons l ON up.lesson_id = l.id
+      JOIN languages lang ON l.language_id = lang.id
+      WHERE up.user_id = $1 AND up.completed_at IS NULL
+      ORDER BY up.started_at DESC
+      LIMIT 1;
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json(null); // nu returnăm eroare, doar nimic
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Error fetching last lesson:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;

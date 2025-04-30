@@ -6,8 +6,8 @@ import dotenv from "dotenv";
 
 // Importarea rutelor ---------------------------------------------
 import authRoutes from "./routes/auth.js";
-import lessonsRoutes from "./routes/languages.js";
-import userProgressRoutes from "./routes/lessons.js";
+import languagesRoutes from "./routes/languages.js";
+import lessonsRoutes from "./routes/lessons.js";
 import exercisesRoutes from "./routes/exercises.js";
 import ttsRouter from "./routes/ttsRouter.js";
 import speechRouter from "./routes/speechRouter.js";
@@ -29,8 +29,8 @@ app.use(express.json()); // Permite procesarea body-ului in format JSON
 
 // Configureaza rutele ---------------------------------------------
 app.use("/api/auth", authRoutes);
-app.use("/api/lessons", lessonsRoutes);
-app.use("/api/user-progress", authenticateToken, userProgressRoutes);
+app.use("/api/languages", languagesRoutes);
+app.use("/api/lessons", authenticateToken, lessonsRoutes);
 app.use("/api/exercises", authenticateToken, exercisesRoutes);
 app.use("/api", ttsRouter);
 app.use("/tts", express.static("public/tts"));
